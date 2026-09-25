@@ -44,6 +44,7 @@ frontend/.cache/
 **/__pycache__/
 **/*.py[cod]
 backend/venv/
+backend/.venv/
 backend/env/
 backend/.pytest_cache/
 backend/.coverage
@@ -51,9 +52,14 @@ backend/htmlcov/
 backend/*.sqlite
 backend/*.db
 
+# Uploaded files (ephemeral on cloud platforms)
+storage/
+backend/storage/
+
 # Temporary & Build Directories
 build/
 dist/
 node_modules/
 tmp/
 scratch/
+.venv/

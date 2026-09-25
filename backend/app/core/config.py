@@ -1,13 +1,20 @@
 from functools import lru_cache
 import json
+import re
 from pathlib import Path
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-from pydantic import Field, field_validator
+from pydantic import Field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 # Resolve backend/.env from the location of this file (backend/app/core/config.py)
 _ENV_FILE = str(Path(__file__).resolve().parent.parent.parent / ".env")
+
+# Patterns that indicate a placeholder/dev secret — never safe for production.
+_UNSAFE_SECRET_PATTERNS = re.compile(
+    r"(CHANGE_ME|12345|placeholder|example|insecure|xxxxxxx)",
+    re.IGNORECASE,
+)
 
 
 class Settings(BaseSettings):
@@ -224,6 +231,35 @@ class Settings(BaseSettings):
     # =========================================================
 
     LOG_LEVEL: str = "INFO"
+
+    # =========================================================
+    # Production Safety Validation
+    # =========================================================
+
+    @model_validator(mode="after")
+    def _enforce_production_safety(self) -> "Settings":
+        """
+        Prevent accidental production deployment without real secrets.
+        """
+        is_prod = self.ENVIRONMENT.lower() in ("production", "prod")
+
+        if is_prod:
+            # Force debug off in production.
+            object.__setattr__(self, "DEBUG", False)
+
+            for field_name in ("JWT_SECRET_KEY", "JWT_REFRESH_SECRET_KEY"):
+                value = getattr(self, field_name, "")
+                if not value or len(value) < 32:
+                    raise ValueError(
+                        f"{field_name} must be at least 32 characters in production. "
+                        f"Generate one with: python -c \"import secrets; print(secrets.token_urlsafe(48))\""
+                    )
+                if _UNSAFE_SECRET_PATTERNS.search(value):
+                    raise ValueError(
+                        f"{field_name} contains a placeholder pattern and is not safe for production."
+                    )
+
+        return self
 
     # =========================================================
     # Derived database URL

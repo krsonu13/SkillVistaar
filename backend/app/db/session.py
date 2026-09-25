@@ -11,7 +11,7 @@ from app.core.config import settings
 
 engine = create_async_engine(
     settings.database_url_async,
-    echo=settings.DEBUG,
+    echo=settings.DEBUG and settings.ENVIRONMENT not in ("production", "prod"),
     pool_pre_ping=True,
     pool_recycle=300,
     pool_size=5,

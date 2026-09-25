@@ -17,7 +17,7 @@ import {
 // ---------------------------------------------------------------------------
 // Base URL configuration (Supports direct backend URL or Vite proxy)
 // ---------------------------------------------------------------------------
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
 
 // ---------------------------------------------------------------------------
 // Unified Axios Client Instance
@@ -1690,7 +1690,7 @@ export function resolveMediaUrl(url?: string): string {
   if (url.startsWith('http://') || url.startsWith('https://') || url.startsWith('data:')) {
     return url;
   }
-  const base = import.meta.env.VITE_API_BASE_URL || 'http://127.0.0.1:8000/api/v1';
+  const base = import.meta.env.VITE_API_BASE_URL || '/api/v1';
   const origin = base.replace(/\/api\/v1\/?$/, '');
   return `${origin}${url.startsWith('/') ? '' : '/'}${url}`;
 }

@@ -42,6 +42,8 @@ async def lifespan(app: FastAPI):
     print(f"Stopping {settings.PROJECT_NAME}...")
 
 
+_is_prod = settings.ENVIRONMENT.lower() in ("production", "prod")
+
 app = FastAPI(
     title=settings.PROJECT_NAME,
     description=(
@@ -50,7 +52,9 @@ app = FastAPI(
         "and government analytics platform."
     ),
     version="1.0.0",
-    debug=settings.DEBUG,
+    debug=settings.DEBUG and not _is_prod,
+    docs_url=None if _is_prod and not settings.DEBUG else "/docs",
+    redoc_url=None if _is_prod and not settings.DEBUG else "/redoc",
     lifespan=lifespan,
 )
 
@@ -127,6 +131,7 @@ async def readiness(res: Response):
 async def health(res: Response):
     """
     Full diagnostic health check: checks Database, SMTP Email, and SMS status.
+    In production, internal details (host, provider name) are omitted.
     """
     database_healthy = await check_database_connection()
     smtp_status = validate_smtp_configuration()
@@ -135,6 +140,16 @@ async def health(res: Response):
     overall_healthy = database_healthy
     if not overall_healthy:
         res.status_code = status.HTTP_503_SERVICE_UNAVAILABLE
+
+    # In production, return a minimal response without internal details.
+    if _is_prod:
+        return {
+            "status": "healthy" if overall_healthy else "degraded",
+            "project": settings.PROJECT_NAME,
+            "database": "connected" if database_healthy else "disconnected",
+            "email_ready": smtp_status["ready"],
+            "sms_ready": sms_status["ready"],
+        }
 
     return {
         "status": "healthy" if overall_healthy else "degraded",

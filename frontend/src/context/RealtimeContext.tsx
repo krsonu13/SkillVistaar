@@ -56,10 +56,26 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       if (isCancelled) return;
 
       const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      // Backend typically runs on localhost:8000 in dev or same host
-      const host = window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-        ? `${window.location.hostname}:8000`
-        : window.location.host;
+
+      // Derive WebSocket host from the configured API base URL.
+      // In production: VITE_API_BASE_URL = "https://your-backend.onrender.com/api/v1"
+      // In dev: Falls back to localhost:8000 for direct backend connection.
+      let host: string;
+      const apiBase = import.meta.env.VITE_API_BASE_URL as string | undefined;
+      if (apiBase && (apiBase.startsWith('http://') || apiBase.startsWith('https://'))) {
+        try {
+          const parsed = new URL(apiBase);
+          host = parsed.host;
+        } catch {
+          host = window.location.host;
+        }
+      } else if (window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1') {
+        // Local development: backend is on port 8000
+        host = `${window.location.hostname}:8000`;
+      } else {
+        // Same-origin deployment
+        host = window.location.host;
+      }
 
       const url = `${wsProtocol}//${host}/api/v1/ws?token=${encodeURIComponent(token)}`;
 
