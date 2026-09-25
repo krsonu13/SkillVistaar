@@ -1,0 +1,3 @@
+"""
+SkillVistaar backend application package.
+"""
