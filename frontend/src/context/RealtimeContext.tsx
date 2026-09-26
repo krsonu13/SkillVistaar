@@ -55,7 +55,15 @@ export const RealtimeProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     const connect = () => {
       if (isCancelled) return;
 
-      const wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      // Determine WebSocket protocol: honor the scheme of VITE_API_BASE_URL if supplied,
+      // otherwise fall back to the page's protocol.
+      let wsProtocol = 'ws:';
+      if (apiBase) {
+        if (apiBase.startsWith('https://')) wsProtocol = 'wss:';
+        else if (apiBase.startsWith('http://')) wsProtocol = 'ws:';
+      } else {
+        wsProtocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      }
 
       // Derive WebSocket host from the configured API base URL.
       // In production: VITE_API_BASE_URL = "https://your-backend.onrender.com/api/v1"

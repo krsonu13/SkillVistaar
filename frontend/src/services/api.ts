@@ -17,7 +17,13 @@ import {
 // ---------------------------------------------------------------------------
 // Base URL configuration (Supports direct backend URL or Vite proxy)
 // ---------------------------------------------------------------------------
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || '/api/v1';
+const rawBase = import.meta.env.VITE_API_BASE_URL?.replace(/\/+$/,'' );
+// Ensure the base URL always ends with '/api/v1'
+const API_BASE_URL = rawBase && rawBase.endsWith('/api/v1')
+  ? rawBase
+  : rawBase
+    ? `${rawBase}/api/v1`
+    : '/api/v1';
 
 // ---------------------------------------------------------------------------
 // Unified Axios Client Instance
