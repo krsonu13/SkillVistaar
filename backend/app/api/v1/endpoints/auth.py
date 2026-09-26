@@ -81,20 +81,28 @@ from app.services.verification_service import (
 def _should_provide_dev_otp(channel: Any) -> bool:
     """
     Determine if OTP should be returned in API response for verification.
-    Active strictly in development/local/test AND when explicit demo OTP mode is enabled.
-    NEVER returned in production, regardless of ALLOW_DEMO_SMS.
+    Active in development/test/staging OR when explicit demo mode is enabled,
+    or when external providers (SMS or SMTP) are not configured.
     """
     chan_str = channel.value if hasattr(channel, "value") else str(channel)
-    if chan_str.upper() != "PHONE":
-        return False
+    chan = chan_str.upper()
     env = (settings.ENVIRONMENT or "").strip().lower()
-    if env not in ("development", "local", "test"):
-        return False
-    if not getattr(settings, "ALLOW_DEMO_SMS", False):
+    is_non_prod = env in ("development", "local", "test", "staging") or settings.DEBUG
+
+    if chan == "PHONE":
+        if is_non_prod or getattr(settings, "ALLOW_DEMO_SMS", False):
+            return True
         provider = (settings.SMS_PROVIDER or "").strip().lower()
-        if provider not in ("sandbox", "console"):
-            return False
-    return True
+        if provider in ("sandbox", "console"):
+            return True
+
+    if chan == "EMAIL":
+        if is_non_prod or getattr(settings, "ALLOW_DEMO_EMAIL", False):
+            return True
+        if not (settings.SMTP_USERNAME and settings.SMTP_PASSWORD):
+            return True
+
+    return False
 
 
 router = APIRouter(

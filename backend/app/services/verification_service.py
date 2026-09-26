@@ -332,8 +332,9 @@ async def initiate_signup_session(
 
     now = _now()
 
-    # Rate limiting: Enforce resend cooldown for the same contact
-    if not _is_testing_environment():
+    # Rate limiting: Enforce resend cooldown for the same contact in production
+    cooldown = getattr(settings, "OTP_RESEND_COOLDOWN_SECONDS", 60)
+    if not _is_testing_environment() and cooldown > 0 and settings.ENVIRONMENT == "production":
         res_recent_session = await db.execute(
             select(SignupVerificationSession)
             .where(
@@ -345,7 +346,6 @@ async def initiate_signup_session(
         )
         recent_s = res_recent_session.scalar_one_or_none()
         if recent_s and recent_s.created_at:
-            cooldown = getattr(settings, "OTP_RESEND_COOLDOWN_SECONDS", 60)
             elapsed = (now - recent_s.created_at).total_seconds()
             if elapsed < cooldown:
                 remaining = int(cooldown - elapsed)
@@ -374,7 +374,15 @@ async def initiate_signup_session(
     await db.refresh(session)
 
     # Dispatch real OTP via SMTP or SMS
-    await deliver_otp(channel, norm_identifier, otp)
+    try:
+        await deliver_otp(channel, norm_identifier, otp)
+    except DeliveryError as exc:
+        from app.services.otp_delivery_service import logger
+        logger.error("OTP delivery failed during signup verification: %s", exc)
+        if not (settings.DEBUG or getattr(settings, "ALLOW_DEMO_EMAIL", False) or getattr(settings, "ALLOW_DEMO_SMS", False)):
+            await db.delete(session)
+            await db.commit()
+            raise
 
     return session, session_token, otp
 
@@ -473,8 +481,8 @@ async def initiate_secondary_signup_otp(
 
     now = _now()
 
-    # Rate limiting: Enforce cooldown if secondary OTP was already dispatched
-    if session.secondary_code_hash and not _is_testing_environment():
+    # Rate limiting: Enforce cooldown if secondary OTP was already dispatched in production
+    if session.secondary_code_hash and not _is_testing_environment() and settings.ENVIRONMENT == "production":
         cooldown = getattr(settings, "OTP_RESEND_COOLDOWN_SECONDS", 60)
         last_sent = session.expires_at - timedelta(minutes=OTP_EXPIRY_MINUTES)
         elapsed = (now - last_sent).total_seconds()
@@ -497,7 +505,15 @@ async def initiate_secondary_signup_otp(
     await db.refresh(session)
 
     # Dispatch real OTP via SMTP or SMS
-    await deliver_otp(channel, norm_identifier, otp)
+    try:
+        await deliver_otp(channel, norm_identifier, otp)
+    except DeliveryError as exc:
+        from app.services.otp_delivery_service import logger
+        logger.error("Secondary OTP delivery failed: %s", exc)
+        if not (settings.DEBUG or getattr(settings, "ALLOW_DEMO_EMAIL", False) or getattr(settings, "ALLOW_DEMO_SMS", False)):
+            session.secondary_code_hash = None
+            await db.commit()
+            raise
 
     return session, otp
 

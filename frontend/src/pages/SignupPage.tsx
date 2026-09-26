@@ -94,6 +94,8 @@ export const SignupPage: React.FC = () => {
   // Countdown timers
   const [timerPrimary, setTimerPrimary] = useState<number>(600);
   const [timerSecondary, setTimerSecondary] = useState<number>(600);
+  const [cooldownPrimary, setCooldownPrimary] = useState<number>(0);
+  const [cooldownSecondary, setCooldownSecondary] = useState<number>(0);
 
   // Additional Details State
   // Candidate
@@ -197,6 +199,18 @@ export const SignupPage: React.FC = () => {
     return () => clearInterval(interval);
   }, [currentStep, timerPrimary, timerSecondary]);
 
+  // Cooldown countdowns
+  useEffect(() => {
+    let interval: any;
+    if (cooldownPrimary > 0 || cooldownSecondary > 0) {
+      interval = setInterval(() => {
+        setCooldownPrimary((c) => (c > 0 ? c - 1 : 0));
+        setCooldownSecondary((c) => (c > 0 ? c - 1 : 0));
+      }, 1000);
+    }
+    return () => clearInterval(interval);
+  }, [cooldownPrimary, cooldownSecondary]);
+
   // Format seconds to mm:ss
   const formatTime = (secs: number) => {
     const m = Math.floor(secs / 60).toString().padStart(2, '0');
@@ -234,7 +248,14 @@ export const SignupPage: React.FC = () => {
       setSuccessNotice(`Verification code sent to ${val}.`);
       setCurrentStep('VERIFY_PRIMARY');
     } catch (err: any) {
-      setServerError(err.message || 'Failed to send verification code.');
+      const msg = err.message || 'Failed to send verification code.';
+      setServerError(msg);
+      const match = msg.match(/wait\s+(\d+)\s+seconds/i);
+      if (match) {
+        setCooldownPrimary(parseInt(match[1], 10));
+      } else if (err.status === 429) {
+        setCooldownPrimary(60);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -300,7 +321,14 @@ export const SignupPage: React.FC = () => {
       setSuccessNotice(`Verification code sent to ${val}.`);
       setCurrentStep('VERIFY_SECONDARY');
     } catch (err: any) {
-      setServerError(err.message || 'Failed to send secondary verification code.');
+      const msg = err.message || 'Failed to send secondary verification code.';
+      setServerError(msg);
+      const match = msg.match(/wait\s+(\d+)\s+seconds/i);
+      if (match) {
+        setCooldownSecondary(parseInt(match[1], 10));
+      } else if (err.status === 429) {
+        setCooldownSecondary(60);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -640,9 +668,14 @@ export const SignupPage: React.FC = () => {
                   variant="primary"
                   size="md"
                   isLoading={isLoading}
+                  disabled={isLoading || cooldownPrimary > 0}
                   className="w-full justify-center"
                 >
-                  Send Verification Code <ArrowRight className="w-4 h-4 ml-1.5" />
+                  {cooldownPrimary > 0 ? (
+                    `Please wait ${cooldownPrimary}s`
+                  ) : (
+                    <>Send Verification Code <ArrowRight className="w-4 h-4 ml-1.5" /></>
+                  )}
                 </Button>
               </div>
             </form>
@@ -811,9 +844,14 @@ export const SignupPage: React.FC = () => {
                   variant="primary"
                   size="md"
                   isLoading={isLoading}
+                  disabled={isLoading || cooldownSecondary > 0}
                   className="w-full justify-center"
                 >
-                  Send Verification Code to {secondaryChannel.toLowerCase()} <ArrowRight className="w-4 h-4 ml-1.5" />
+                  {cooldownSecondary > 0 ? (
+                    `Please wait ${cooldownSecondary}s`
+                  ) : (
+                    <>Send Verification Code to {secondaryChannel.toLowerCase()} <ArrowRight className="w-4 h-4 ml-1.5" /></>
+                  )}
                 </Button>
               </div>
             </form>

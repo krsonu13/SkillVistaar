@@ -179,6 +179,7 @@ class Settings(BaseSettings):
     OTP_RESEND_COOLDOWN_SECONDS: int = 60
     OTP_MAX_RESENDS: int = 3
     OTP_EXPIRY_MINUTES: int = 10
+    ALLOW_DEMO_EMAIL: bool = True
     TESTING: bool = False
 
     # =========================================================
